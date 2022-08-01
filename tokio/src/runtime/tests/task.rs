@@ -326,7 +326,7 @@ impl Schedule for Runtime {
         self.0.owned.remove(task)
     }
 
-    fn schedule(&self, task: Notified<Self>) -> Result<(), SpawnError> {
+    fn schedule(&self, task: task::Notified<Self>) -> Result<(), task::SpawnError> {
         self.0.core.try_lock().unwrap().queue.push_back(task);
         Ok(())
     }
