@@ -63,7 +63,7 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime;
 use crate::runtime::enter::EnterContext;
-use crate::runtime::task::{Inject, JoinHandle, OwnedTasks};
+use crate::runtime::task::{Inject, JoinHandle, OwnedTasks, SpawnError};
 use crate::runtime::thread_pool::{queue, Idle, Parker, Unparker};
 use crate::runtime::{task, Callback, HandleInner, MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::util::atomic_cell::AtomicCell;
@@ -713,8 +713,9 @@ impl task::Schedule for Arc<Shared> {
         self.owned.remove(task)
     }
 
-    fn schedule(&self, task: Notified) {
+    fn schedule(&self, task: Notified) -> Result<(), SpawnError> {
         (**self).schedule(task, false);
+        Ok(())
     }
 
     fn yield_now(&self, task: Notified) {

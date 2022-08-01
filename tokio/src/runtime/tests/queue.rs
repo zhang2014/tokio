@@ -242,7 +242,7 @@ impl Schedule for Runtime {
         None
     }
 
-    fn schedule(&self, _task: task::Notified<Self>) {
+    fn schedule(&self, _task: task::Notified<Self>) -> Result<(), task::SpawnError> {
         unreachable!();
     }
 }

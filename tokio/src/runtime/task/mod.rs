@@ -144,8 +144,9 @@ use self::core::Cell;
 use self::core::Header;
 
 mod error;
+pub(crate) use self::error::SpawnErrorRepr;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
-pub use self::error::JoinError;
+pub use self::error::{JoinError, SpawnError};
 
 mod harness;
 use self::harness::Harness;
@@ -255,12 +256,12 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     fn release(&self, task: &Task<Self>) -> Option<Task<Self>>;
 
     /// Schedule the task
-    fn schedule(&self, task: Notified<Self>);
+    fn schedule(&self, task: Notified<Self>) -> std::result::Result<(), SpawnError>;
 
     /// Schedule the task to run in the near future, yielding the thread to
     /// other tasks.
     fn yield_now(&self, task: Notified<Self>) {
-        self.schedule(task);
+        let _ = self.schedule(task);
     }
 
     /// Polling the task resulted in a panic. Should the runtime shutdown?

@@ -1,5 +1,5 @@
 use crate::runtime::blocking::{BlockingTask, NoopSchedule};
-use crate::runtime::task::{self, JoinHandle};
+use crate::runtime::task::{self, JoinHandle, SpawnError, SpawnErrorRepr};
 use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
@@ -180,7 +180,9 @@ impl Handle {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        self.spawn_named(future, None)
+        // Compat: ignore errors
+        let (ret, _err) = self.spawn_named(future, None);
+        ret
     }
 
     /// Runs the provided function on an executor dedicated to blocking.
@@ -304,7 +306,11 @@ impl Handle {
     }
 
     #[track_caller]
-    pub(crate) fn spawn_named<F>(&self, future: F, _name: Option<&str>) -> JoinHandle<F::Output>
+    pub(crate) fn spawn_named<F>(
+        &self,
+        future: F,
+        _name: Option<&str>,
+    ) -> (JoinHandle<F::Output>, Result<(), SpawnError>)
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -355,11 +361,13 @@ impl HandleInner {
 
         match spawn_result {
             Ok(()) => join_handle,
-            // Compat: do not panic here, return the join_handle even though it will never resolve
-            Err(blocking::SpawnError::ShuttingDown) => join_handle,
-            Err(blocking::SpawnError::NoThreads(e)) => {
-                panic!("OS can't spawn worker thread: {}", e)
-            }
+            Err(e) => match e.repr {
+                // Compat: do not panic here, return the join_handle even though it will never resolve
+                SpawnErrorRepr::Shutdown => join_handle,
+                SpawnErrorRepr::NoBlockingThreads(e) => {
+                    panic!("OS can't spawn worker thread: {}", e)
+                }
+            },
         }
     }
 
@@ -405,7 +413,7 @@ impl HandleInner {
         is_mandatory: blocking::Mandatory,
         name: Option<&str>,
         rt: &dyn ToHandle,
-    ) -> (JoinHandle<R>, Result<(), blocking::SpawnError>)
+    ) -> (JoinHandle<R>, Result<(), SpawnError>)
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,

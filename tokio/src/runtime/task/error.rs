@@ -163,3 +163,76 @@ impl From<JoinError> for io::Error {
         )
     }
 }
+
+cfg_rt! {
+    /// Failed to spawn a task
+    #[derive(Debug)]
+    pub struct SpawnError {
+        pub(crate) repr: SpawnErrorRepr,
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum SpawnErrorRepr {
+    /// Pool is shutting down and the task was not scheduled
+    Shutdown,
+    /// There are no worker threads available to take the task
+    /// and the OS failed to spawn a new one
+    NoBlockingThreads(io::Error),
+}
+
+impl SpawnError {
+    pub(crate) fn shutdown() -> Self {
+        Self {
+            repr: SpawnErrorRepr::Shutdown,
+        }
+    }
+
+    pub(crate) fn no_blocking_threads(e: io::Error) -> Self {
+        Self {
+            repr: SpawnErrorRepr::NoBlockingThreads(e),
+        }
+    }
+
+    /// Returns true if the error was caused by the runtime being shutdown.
+    pub fn is_shutdown(&self) -> bool {
+        matches!(&self.repr, SpawnErrorRepr::Shutdown)
+    }
+
+    /// Returns true if the error was caused by the blocking
+    /// threadpool unable to spawn additional threads
+    pub fn is_no_blocking_threads(&self) -> bool {
+        matches!(&self.repr, SpawnErrorRepr::NoBlockingThreads(_))
+    }
+}
+
+impl fmt::Display for SpawnError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.repr {
+            SpawnErrorRepr::Shutdown => fmt.write_str("runtime shutting down"),
+            SpawnErrorRepr::NoBlockingThreads(_) => {
+                fmt.write_str("unable to spawn blocking thread")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SpawnError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.repr {
+            SpawnErrorRepr::Shutdown => None,
+            SpawnErrorRepr::NoBlockingThreads(e) => Some(e),
+        }
+    }
+}
+
+impl From<SpawnError> for io::Error {
+    fn from(src: SpawnError) -> io::Error {
+        match src.repr {
+            SpawnErrorRepr::Shutdown => {
+                io::Error::new(io::ErrorKind::Other, "runtime shutting down")
+            }
+            SpawnErrorRepr::NoBlockingThreads(e) => e,
+        }
+    }
+}

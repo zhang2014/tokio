@@ -1,5 +1,5 @@
 use crate::future::Future;
-use crate::runtime::task::Id;
+use crate::runtime::task::{Id, SpawnError};
 use crate::runtime::{basic_scheduler, HandleInner};
 use crate::task::JoinHandle;
 
@@ -24,7 +24,11 @@ impl Spawner {
         }
     }
 
-    pub(crate) fn spawn<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(
+        &self,
+        future: F,
+        id: Id,
+    ) -> (JoinHandle<F::Output>, Result<(), SpawnError>)
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -32,7 +36,7 @@ impl Spawner {
         match self {
             Spawner::Basic(spawner) => spawner.spawn(future, id),
             #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
-            Spawner::ThreadPool(spawner) => spawner.spawn(future, id),
+            Spawner::ThreadPool(spawner) => (spawner.spawn(future, id), Ok(())),
         }
     }
 

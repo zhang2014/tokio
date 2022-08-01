@@ -1,4 +1,4 @@
-use crate::runtime::task::{self, Task};
+use crate::runtime::task::{self, SpawnError, Task};
 
 /// `task::Schedule` implementation that does nothing. This is unique to the
 /// blocking scheduler as tasks scheduled are not really futures but blocking
@@ -13,7 +13,7 @@ impl task::Schedule for NoopSchedule {
         None
     }
 
-    fn schedule(&self, _task: task::Notified<Self>) {
+    fn schedule(&self, _task: task::Notified<Self>) -> Result<(), SpawnError> {
         unreachable!();
     }
 }

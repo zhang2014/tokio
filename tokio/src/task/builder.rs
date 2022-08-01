@@ -1,9 +1,9 @@
 #![allow(unreachable_pub)]
 use crate::{
-    runtime::{context, Handle},
+    runtime::{context, task::SpawnError, Handle},
     task::{JoinHandle, LocalSet},
 };
-use std::{future::Future, io};
+use std::future::Future;
 
 /// Factory which is used to configure the properties of a new task.
 ///
@@ -83,12 +83,13 @@ impl<'a> Builder<'a> {
     /// See [`task::spawn`](crate::task::spawn) for
     /// more details.
     #[track_caller]
-    pub fn spawn<Fut>(self, future: Fut) -> io::Result<JoinHandle<Fut::Output>>
+    pub fn spawn<Fut>(self, future: Fut) -> Result<JoinHandle<Fut::Output>, SpawnError>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        Ok(super::spawn::spawn_inner(future, self.name))
+        let (handle, res) = super::spawn::spawn_inner(future, self.name);
+        res.map(|()| handle)
     }
 
     /// Spawn a task with this builder's settings on the provided [runtime
@@ -103,12 +104,13 @@ impl<'a> Builder<'a> {
         &mut self,
         future: Fut,
         handle: &Handle,
-    ) -> io::Result<JoinHandle<Fut::Output>>
+    ) -> Result<JoinHandle<Fut::Output>, SpawnError>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        Ok(handle.spawn_named(future, self.name))
+        let (handle, res) = handle.spawn_named(future, self.name);
+        res.map(|()| handle)
     }
 
     /// Spawns `!Send` a task on the current [`LocalSet`] with this builder's
@@ -126,12 +128,13 @@ impl<'a> Builder<'a> {
     /// [`task::spawn_local`]: crate::task::spawn_local
     /// [`LocalSet`]: crate::task::LocalSet
     #[track_caller]
-    pub fn spawn_local<Fut>(self, future: Fut) -> io::Result<JoinHandle<Fut::Output>>
+    pub fn spawn_local<Fut>(self, future: Fut) -> Result<JoinHandle<Fut::Output>, SpawnError>
     where
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        Ok(super::local::spawn_local_inner(future, self.name))
+        let (handle, res) = super::local::spawn_local_inner(future, self.name);
+        res.map(|()| handle)
     }
 
     /// Spawns `!Send` a task on the provided [`LocalSet`] with this builder's
@@ -146,12 +149,13 @@ impl<'a> Builder<'a> {
         self,
         future: Fut,
         local_set: &LocalSet,
-    ) -> io::Result<JoinHandle<Fut::Output>>
+    ) -> Result<JoinHandle<Fut::Output>, SpawnError>
     where
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        Ok(local_set.spawn_named(future, self.name))
+        let (handle, res) = local_set.spawn_named(future, self.name);
+        res.map(|()| handle)
     }
 
     /// Spawns blocking code on the blocking threadpool.
@@ -166,7 +170,7 @@ impl<'a> Builder<'a> {
     pub fn spawn_blocking<Function, Output>(
         self,
         function: Function,
-    ) -> io::Result<JoinHandle<Output>>
+    ) -> Result<JoinHandle<Output>, SpawnError>
     where
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
@@ -185,7 +189,7 @@ impl<'a> Builder<'a> {
         self,
         function: Function,
         handle: &Handle,
-    ) -> io::Result<JoinHandle<Output>>
+    ) -> Result<JoinHandle<Output>, SpawnError>
     where
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
