@@ -1,10 +1,7 @@
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 mod tests {
     use std::rc::Rc;
-    use tokio::{
-        runtime::Handle,
-        task::{Builder, JoinHandle, LocalSet, SpawnError},
-    };
+    use tokio::task::{Builder, JoinHandle, LocalSet, SpawnError};
 
     #[tokio::test]
     async fn spawn_with_name() {
