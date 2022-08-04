@@ -194,12 +194,12 @@ impl SpawnError {
         }
     }
 
-    /// Returns true if the error was caused by the runtime being shutdown.
+    /// Returns `true` if the error was caused by the runtime being shutdown.
     pub fn is_shutdown(&self) -> bool {
         matches!(&self.repr, SpawnErrorRepr::Shutdown)
     }
 
-    /// Returns true if the error was caused by the blocking
+    /// Returns `true` if the error was caused by the blocking
     /// threadpool unable to spawn additional threads
     pub fn is_no_blocking_threads(&self) -> bool {
         matches!(&self.repr, SpawnErrorRepr::NoBlockingThreads(_))
