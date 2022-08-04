@@ -853,14 +853,11 @@ impl Shared {
                     // LocalSet is dropped). Then push to it if so
                     let mut lock = self.queue.lock();
 
-                    match lock.as_mut() {
-                        Some(queue) => {
-                            queue.push_back(task);
-                            drop(lock);
-                            self.waker.wake();
-                            Ok(())
-                        }
-                        None => Err(SpawnError::shutdown()),
+                    let queue = lock.as_mut().ok_or(SpawnError::shutdown)?;
+                    queue.push_back(task);
+                    drop(lock);
+                    self.waker.wake();
+                    Ok(())
                     }
                 }
             }
