@@ -2,7 +2,7 @@ use std::any::Any;
 use std::fmt;
 use std::io;
 
-use super::Id;
+use super::{Id, JoinHandle};
 use crate::util::SyncWrapper;
 cfg_rt! {
     /// Task failed to execute to completion.
@@ -234,5 +234,18 @@ impl From<SpawnError> for io::Error {
             }
             SpawnErrorKind::NoBlockingThreads(e) => e,
         }
+    }
+}
+
+// Internal type for making it easier to return an error and JoinHandle
+// while maintaining API compatibility
+pub(crate) struct SpawnFailure<T> {
+    pub(crate) handle: JoinHandle<T>,
+    pub(crate) inner: SpawnError,
+}
+
+impl<T> SpawnFailure<T> {
+    pub(crate) fn new(handle: JoinHandle<T>, inner: SpawnError) -> Self {
+        Self { handle, inner }
     }
 }

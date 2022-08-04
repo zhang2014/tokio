@@ -4,7 +4,9 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::park::{Park, Unpark};
 use crate::runtime::context::EnterGuard;
 use crate::runtime::driver::Driver;
-use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, SpawnError, Task};
+use crate::runtime::task::{
+    self, JoinHandle, OwnedTasks, Schedule, SpawnError, SpawnFailure, Task,
+};
 use crate::runtime::{Callback, HandleInner};
 use crate::runtime::{MetricsBatch, SchedulerMetrics, WorkerMetrics};
 use crate::sync::notify::Notify;
@@ -380,19 +382,20 @@ impl Spawner {
         &self,
         future: F,
         id: super::task::Id,
-    ) -> (JoinHandle<F::Output>, Result<(), SpawnError>)
+    ) -> Result<JoinHandle<F::Output>, SpawnFailure<F::Output>>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
         let (handle, notified) = self.shared.owned.bind(future, self.shared.clone(), id);
 
-        let res = match notified {
-            Some(notified) => self.shared.schedule(notified),
-            None => Err(SpawnError::shutdown()),
-        };
-
-        (handle, res)
+        match notified {
+            Some(notified) => match self.shared.schedule(notified) {
+                Ok(()) => Ok(handle),
+                Err(e) => Err(SpawnFailure::new(handle, e)),
+            },
+            None => Err(SpawnFailure::new(handle, SpawnError::shutdown())),
+        }
     }
 
     fn pop(&self) -> Option<task::Notified<Arc<Shared>>> {

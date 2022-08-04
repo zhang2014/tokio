@@ -88,8 +88,7 @@ impl<'a> Builder<'a> {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        let (handle, res) = super::spawn::spawn_inner(future, self.name);
-        res.map(|()| handle)
+        super::spawn::spawn_inner(future, self.name).map_err(|e| e.inner)
     }
 
     /// Spawn a task with this builder's settings on the provided [runtime
@@ -109,8 +108,7 @@ impl<'a> Builder<'a> {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        let (handle, res) = handle.spawn_named(future, self.name);
-        res.map(|()| handle)
+        handle.spawn_named(future, self.name).map_err(|e| e.inner)
     }
 
     /// Spawns `!Send` a task on the current [`LocalSet`] with this builder's
@@ -133,8 +131,7 @@ impl<'a> Builder<'a> {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        let (handle, res) = super::local::spawn_local_inner(future, self.name);
-        res.map(|()| handle)
+        super::local::spawn_local_inner(future, self.name).map_err(|e| e.inner)
     }
 
     /// Spawns `!Send` a task on the provided [`LocalSet`] with this builder's
@@ -154,8 +151,9 @@ impl<'a> Builder<'a> {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        let (handle, res) = local_set.spawn_named(future, self.name);
-        res.map(|()| handle)
+        local_set
+            .spawn_named(future, self.name)
+            .map_err(|e| e.inner)
     }
 
     /// Spawns blocking code on the blocking threadpool.
@@ -195,14 +193,9 @@ impl<'a> Builder<'a> {
         Output: Send + 'static,
     {
         use crate::runtime::Mandatory;
-        let (join_handle, spawn_result) = handle.as_inner().spawn_blocking_inner(
-            function,
-            Mandatory::NonMandatory,
-            self.name,
-            handle,
-        );
-
-        spawn_result?;
-        Ok(join_handle)
+        handle
+            .as_inner()
+            .spawn_blocking_inner(function, Mandatory::NonMandatory, self.name, handle)
+            .map_err(|e| e.inner)
     }
 }

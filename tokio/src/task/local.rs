@@ -1,6 +1,6 @@
 //! Runs `!Send` futures on the current thread.
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, SpawnError, Task};
+use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, SpawnError, SpawnFailure, Task};
 use crate::sync::AtomicWaker;
 use crate::util::VecDequeCell;
 
@@ -302,13 +302,12 @@ cfg_rt! {
         F::Output: 'static,
     {
         // Compat: ignore errors here
-        let (handle, _res) = spawn_local_inner(future, None);
-        handle
+        spawn_local_inner(future, None).unwrap_or_else(|e| e.handle)
     }
 
 
     #[track_caller]
-    pub(super) fn spawn_local_inner<F>(future: F, name: Option<&str>) -> (JoinHandle<F::Output>, Result<(), SpawnError>)
+    pub(super) fn spawn_local_inner<F>(future: F, name: Option<&str>) -> Result<JoinHandle<F::Output>, SpawnFailure<F::Output>>
     where F: Future + 'static,
           F::Output: 'static
     {
@@ -318,7 +317,6 @@ cfg_rt! {
                 None => panic!("`spawn_local` called from outside of a `task::LocalSet`"),
                 Some(cx) => cx.spawn(future, name)
             }
-
         })
     }
 }
@@ -425,8 +423,7 @@ impl LocalSet {
         F::Output: 'static,
     {
         // Compat: ignore errors here
-        let (handle, _res) = self.spawn_named(future, None);
-        handle
+        self.spawn_named(future, None).unwrap_or_else(|e| e.handle)
     }
 
     /// Runs a future to completion on the provided runtime, driving any local
@@ -544,12 +541,12 @@ impl LocalSet {
         &self,
         future: F,
         name: Option<&str>,
-    ) -> (JoinHandle<F::Output>, Result<(), SpawnError>)
+    ) -> Result<JoinHandle<F::Output>, SpawnFailure<F::Output>>
     where
         F: Future + 'static,
         F::Output: 'static,
     {
-        let (handle, res) = self.context.spawn(future, name);
+        let res = self.context.spawn(future, name);
 
         // Because a task was spawned from *outside* the `LocalSet`, wake the
         // `LocalSet` future to execute the new task, if it hasn't been woken.
@@ -558,7 +555,7 @@ impl LocalSet {
         // only be called from *within* a future executing on the `LocalSet` —
         // in that case, the `LocalSet` must already be awake.
         self.context.shared.waker.wake();
-        (handle, res)
+        res
     }
 
     /// Ticks the scheduler, returning whether the local future needs to be
@@ -779,7 +776,7 @@ impl Context {
         &self,
         future: F,
         name: Option<&str>,
-    ) -> (JoinHandle<F::Output>, Result<(), SpawnError>)
+    ) -> Result<JoinHandle<F::Output>, SpawnFailure<F::Output>>
     where
         F: Future + 'static,
         F::Output: 'static,
@@ -789,12 +786,13 @@ impl Context {
 
         let (handle, notified) = self.owned.bind(future, self.shared.clone(), id);
 
-        let res = match notified {
-            Some(notified) => self.shared.schedule(notified),
-            None => Err(SpawnError::shutdown()),
-        };
-
-        (handle, res)
+        match notified {
+            Some(notified) => match self.shared.schedule(notified) {
+                Ok(()) => Ok(handle),
+                Err(e) => Err(SpawnFailure::new(handle, e)),
+            },
+            None => Err(SpawnFailure::new(handle, SpawnError::shutdown())),
+        }
     }
 }
 
