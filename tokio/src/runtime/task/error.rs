@@ -199,8 +199,8 @@ impl SpawnError {
         matches!(&self.kind, SpawnErrorKind::Shutdown)
     }
 
-    /// Returns `true` if the error was caused by the blocking
-    /// threadpool unable to spawn additional threads
+    /// Returns `true` if the error was caused by a blocking spawn failing
+    /// because the blocking threadpool was unable to spawn additional threads.
     pub fn is_no_blocking_threads(&self) -> bool {
         matches!(&self.kind, SpawnErrorKind::NoBlockingThreads(_))
     }
