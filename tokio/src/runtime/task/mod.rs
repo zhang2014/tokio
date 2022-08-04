@@ -144,7 +144,7 @@ use self::core::Cell;
 use self::core::Header;
 
 mod error;
-pub(crate) use self::error::SpawnErrorRepr;
+pub(crate) use self::error::SpawnErrorKind;
 #[allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 pub use self::error::{JoinError, SpawnError};
 

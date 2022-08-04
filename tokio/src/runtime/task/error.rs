@@ -168,12 +168,12 @@ cfg_rt! {
     /// Failed to spawn a task
     #[derive(Debug)]
     pub struct SpawnError {
-        pub(crate) repr: SpawnErrorRepr,
+        pub(crate) kind: SpawnErrorKind,
     }
 }
 
 #[derive(Debug)]
-pub(crate) enum SpawnErrorRepr {
+pub(crate) enum SpawnErrorKind {
     /// Pool is shutting down and the task was not scheduled
     Shutdown,
     /// There are no worker threads available to take the task
@@ -184,33 +184,33 @@ pub(crate) enum SpawnErrorRepr {
 impl SpawnError {
     pub(crate) fn shutdown() -> Self {
         Self {
-            repr: SpawnErrorRepr::Shutdown,
+            kind: SpawnErrorKind::Shutdown,
         }
     }
 
     pub(crate) fn no_blocking_threads(e: io::Error) -> Self {
         Self {
-            repr: SpawnErrorRepr::NoBlockingThreads(e),
+            kind: SpawnErrorKind::NoBlockingThreads(e),
         }
     }
 
     /// Returns `true` if the error was caused by the runtime being shutdown.
     pub fn is_shutdown(&self) -> bool {
-        matches!(&self.repr, SpawnErrorRepr::Shutdown)
+        matches!(&self.kind, SpawnErrorKind::Shutdown)
     }
 
     /// Returns `true` if the error was caused by the blocking
     /// threadpool unable to spawn additional threads
     pub fn is_no_blocking_threads(&self) -> bool {
-        matches!(&self.repr, SpawnErrorRepr::NoBlockingThreads(_))
+        matches!(&self.kind, SpawnErrorKind::NoBlockingThreads(_))
     }
 }
 
 impl fmt::Display for SpawnError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.repr {
-            SpawnErrorRepr::Shutdown => fmt.write_str("runtime shutting down"),
-            SpawnErrorRepr::NoBlockingThreads(_) => {
+        match &self.kind {
+            SpawnErrorKind::Shutdown => fmt.write_str("runtime shutting down"),
+            SpawnErrorKind::NoBlockingThreads(_) => {
                 fmt.write_str("unable to spawn blocking thread")
             }
         }
@@ -219,20 +219,20 @@ impl fmt::Display for SpawnError {
 
 impl std::error::Error for SpawnError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match &self.repr {
-            SpawnErrorRepr::Shutdown => None,
-            SpawnErrorRepr::NoBlockingThreads(e) => Some(e),
+        match &self.kind {
+            SpawnErrorKind::Shutdown => None,
+            SpawnErrorKind::NoBlockingThreads(e) => Some(e),
         }
     }
 }
 
 impl From<SpawnError> for io::Error {
     fn from(src: SpawnError) -> io::Error {
-        match src.repr {
-            SpawnErrorRepr::Shutdown => {
+        match src.kind {
+            SpawnErrorKind::Shutdown => {
                 io::Error::new(io::ErrorKind::Other, "runtime shutting down")
             }
-            SpawnErrorRepr::NoBlockingThreads(e) => e,
+            SpawnErrorKind::NoBlockingThreads(e) => e,
         }
     }
 }

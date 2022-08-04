@@ -1,5 +1,5 @@
 use crate::runtime::blocking::{BlockingTask, NoopSchedule};
-use crate::runtime::task::{self, JoinHandle, SpawnError, SpawnErrorRepr};
+use crate::runtime::task::{self, JoinHandle, SpawnError, SpawnErrorKind};
 use crate::runtime::{blocking, context, driver, Spawner};
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
@@ -361,10 +361,10 @@ impl HandleInner {
 
         match spawn_result {
             Ok(()) => join_handle,
-            Err(e) => match e.repr {
+            Err(e) => match e.kind {
                 // Compat: do not panic here, return the join_handle even though it will never resolve
-                SpawnErrorRepr::Shutdown => join_handle,
-                SpawnErrorRepr::NoBlockingThreads(e) => {
+                SpawnErrorKind::Shutdown => join_handle,
+                SpawnErrorKind::NoBlockingThreads(e) => {
                     panic!("OS can't spawn worker thread: {}", e)
                 }
             },
