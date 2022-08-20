@@ -373,7 +373,7 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
         rt = quote! { #rt.start_paused(#v) };
     }
     if is_test {
-        quote! { #rt.thread_name(thread_name) }
+        rt = quote! { #rt.thread_name(thread_name) };
     }
 
     let header = if is_test {
