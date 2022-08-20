@@ -372,10 +372,21 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
     if let Some(v) = config.start_paused {
         rt = quote! { #rt.start_paused(#v) };
     }
+    if is_test {
+        quote! { #rt.thread_name(thread_name) }
+    }
 
     let header = if is_test {
         quote! {
             #[::core::prelude::v1::test]
+        }
+    } else {
+        quote! {}
+    };
+
+    let thread_name = if is_test {
+        quote! {
+            let thread_name = std::thread::current().name().unwrap_or("tokio-runtime-worker");
         }
     } else {
         quote! {}
@@ -388,6 +399,7 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
             let body = async #body;
             #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
             {
+                #thread_name;
                 return #rt
                     .enable_all()
                     .build()
